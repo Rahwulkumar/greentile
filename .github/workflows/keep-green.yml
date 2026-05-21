@@ -1,0 +1,70 @@
+name: Keep Graph Green
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 10 * * *"
+      timezone: "Asia/Kolkata"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: githubgreen-daily
+  cancel-in-progress: false
+
+jobs:
+  keep-green:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        shell: pwsh
+        env:
+          GH_GREEN_EMAIL: ${{ vars.GH_GREEN_EMAIL }}
+          GH_GREEN_NAME: ${{ vars.GH_GREEN_NAME }}
+        run: |
+          $name = if ($env:GH_GREEN_NAME) { $env:GH_GREEN_NAME } else { $env:GITHUB_ACTOR }
+          $email = if ($env:GH_GREEN_EMAIL) { $env:GH_GREEN_EMAIL } else { "$($env:GITHUB_ACTOR)@users.noreply.github.com" }
+
+          git config user.name $name
+          git config user.email $email
+
+      - name: Create daily commits
+        shell: pwsh
+        run: |
+          $count = Get-Random -Minimum 1 -Maximum 5
+          $now = [DateTimeOffset]::UtcNow
+          $dayStart = $now.Date
+          $maxMinute = [Math]::Max(1, [int][Math]::Floor(($now - $dayStart).TotalMinutes) + 1)
+          $stamps = @()
+
+          for ($i = 0; $i -lt $count; $i++) {
+            $minuteOfDay = Get-Random -Minimum 0 -Maximum $maxMinute
+            $stamps += $dayStart.AddMinutes($minuteOfDay)
+          }
+
+          $stamps = $stamps | Sort-Object
+
+          foreach ($stamp in $stamps) {
+            & "$PWD/scripts/write-green-entry.ps1" -EntryDate $stamp.ToString("o")
+            git add data/green-log.jsonl
+            git diff --cached --quiet
+
+            if ($LASTEXITCODE -eq 0) {
+              continue
+            }
+
+            $iso = $stamp.ToString("o")
+            $env:GIT_AUTHOR_DATE = $iso
+            $env:GIT_COMMITTER_DATE = $iso
+
+            git commit -m "chore: keep graph green $($stamp.ToString('yyyy-MM-dd')) [skip ci]"
+          }
+
+          git push
