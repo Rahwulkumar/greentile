@@ -4,7 +4,7 @@
 
 It works in two layers:
 
-1. A GitHub Actions workflow makes a few small commits every day.
+1. A GitHub Actions workflow makes a few small commits on five randomly selected days each week.
 2. A local backfill script can fill older dates so the last 365 days are not mostly blank.
 
 ## How it works
@@ -28,15 +28,25 @@ The workflow appends a tiny JSON line to `data/green-log.jsonl` and pushes the c
 
 If you keep the repo private, enable private contributions on your GitHub profile if you want the tiles to show up there.
 
-## Daily automation
+## Weekly automation
 
 The scheduled workflow lives at `.github/workflows/keep-green.yml`.
 
 By default it:
 
-- runs every day in the `Asia/Kolkata` time zone
-- makes a random `1` to `4` commits
+- checks every day in the `Asia/Kolkata` time zone
+- selects exactly five days per Monday-Sunday week, including possible weekends, and skips the other two
+- uses the week's Monday date as a random seed so retries and manual runs keep the same selection
+- makes a random `1` to `4` commits on each selected day, dated within that India calendar day
 - changes a real tracked file so the commits are not empty
+
+Manual runs also respect the two days off. The five-day target depends on the workflow running successfully on each selected day; missed runs are not backfilled. Existing history is unchanged, so a week already in progress may still contain commits from the old daily schedule.
+
+To check the weekly selection and date boundaries locally:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test-green-schedule.ps1
+```
 
 ## Backfill old days
 

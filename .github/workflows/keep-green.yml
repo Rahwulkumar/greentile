@@ -35,12 +35,18 @@ jobs:
           git config user.name $name
           git config user.email $email
 
-      - name: Create daily commits
+      - name: Create commits on selected days
         shell: pwsh
         run: |
+          $now = [DateTimeOffset]::UtcNow.ToOffset([TimeSpan]::FromMinutes(330))
+
+          if (-not (& "$PWD/scripts/test-green-day.ps1" -Now $now)) {
+            Write-Host "Skipping today: this week has five selected commit days and two days off."
+            exit 0
+          }
+
           $count = Get-Random -Minimum 1 -Maximum 5
-          $now = [DateTimeOffset]::UtcNow
-          $dayStart = $now.Date
+          $dayStart = [DateTimeOffset]::new($now.Date, $now.Offset)
           $maxMinute = [Math]::Max(1, [int][Math]::Floor(($now - $dayStart).TotalMinutes) + 1)
           $stamps = @()
 
